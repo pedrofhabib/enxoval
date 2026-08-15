@@ -180,8 +180,29 @@ nav.tabs button.on{color:var(--accent-ink);font-weight:600}
 .piece .ph{aspect-ratio:1;background:var(--chip);display:flex;align-items:center;justify-content:center;color:var(--muted);overflow:hidden;position:relative}
 .piece .ph img{width:100%;height:100%;object-fit:cover;display:block}
 .piece .ph .szb{position:absolute;top:7px;right:7px;background:rgba(24,30,36,.62);color:#fff;font-size:.66rem;padding:2px 8px;border-radius:99px;letter-spacing:.03em}
-.piece .pinfo{padding:8px 10px;display:flex;align-items:center;gap:6px}
-.piece .pname{font-size:.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.piece .pinfo{padding:8px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.piece .pname{font-size:.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.piece .pmeta{flex-basis:100%;font-size:.68rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attrchips{display:flex;flex-wrap:wrap;gap:6px}
+.achipbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:5px 12px;font-size:.8rem;font-family:inherit;cursor:pointer}
+.achipbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+/* inventário */
+.invtop{display:flex;justify-content:space-between;align-items:center;margin:2px 0 12px;font-size:.85rem;color:var(--muted)}
+.invrow{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:8px;box-shadow:var(--shadow)}
+.invmain{display:flex;align-items:center;gap:8px;cursor:pointer}
+.invmain .chev{color:var(--muted);width:14px;font-size:.8rem}
+.invname{flex:1;font-weight:600;font-size:.93rem}
+.invcount{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border-radius:99px;padding:2px 10px;font-size:.85rem}
+.invsub{font-size:.75rem;color:var(--muted);margin:2px 0 0 22px}
+.invdetail{margin:8px 0 2px 22px;border-left:2px solid var(--line);padding-left:10px}
+.invattr{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:8px 0 3px;font-weight:600}
+.invsubrow{display:flex;justify-content:space-between;width:100%;border:0;background:none;color:var(--ink);font-family:inherit;font-size:.86rem;padding:6px 4px;cursor:pointer;border-radius:8px;text-align:left}
+.invsubrow span{color:var(--muted);font-variant-numeric:tabular-nums}
+.invsubrow:active{background:var(--chip)}
+.invsubrow.muted{color:var(--muted)}
+.invcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);cursor:pointer;margin-bottom:8px}
+.invcard .t{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:4px}
+.invcard .l{font-size:.88rem}
 .piece .dots{display:flex;gap:3px;flex:none}
 .shelf{margin-bottom:18px}
 .shelf-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;color:var(--ink)}
@@ -417,9 +438,9 @@ const GROUPS = [
 ];
 const TYPES = [
   { key: "panoboca", label: "Pano de boca", g: "alimentacao", kw: /pano de boca|paninho|fralda de boca|fralda de ombro/ },
+  { key: "conjunto", label: "Conjunto", g: "roupas", kw: /conjunto|\bkit\b|\bconj\b/ },
   { key: "body", label: "Body", g: "roupas", kw: /\bbod(y|ies|ys)\b/ },
   { key: "macacao", label: "Macacão", g: "roupas", kw: /macac|macaqu|romper|jardineira/ },
-  { key: "conjunto", label: "Conjunto", g: "roupas", kw: /conjunto|\bkit\b/ },
   { key: "vestido", label: "Vestido/Saia", g: "roupas", kw: /vestido|\bsaia\b/ },
   { key: "casaco", label: "Casaco/Moletom", g: "roupas", kw: /casaco|jaqueta|sueter|cardig|colete|moletom|\bbluson\b/ },
   { key: "blusa", label: "Blusa/Camiseta", g: "roupas", kw: /blusa|camis|\bmanga (curta|longa)\b|regata/ },
@@ -454,6 +475,96 @@ const COLOR_HEX = {
   verde: "#7FB58E", azul: "#5B8FC9", roxo: "#9B7FC9"
 };
 const TAG_KW = { listrado: /listrad/, estampado: /estampad|floral|xadrez|bolinha|poa|bichinho/, bordado: /bordad/, "tricô": /trico|\bla\b|croche/, algodão: /algodao|\bmalha\b|suedine/, plush: /plush|fleece|soft/ };
+
+/* ---- subclassificações por tipo de peça ---- */
+const COMP_LABEL = { body: "Body", blusa: "Blusa", calca: "Calça", short: "Short", casaco: "Casaco", gorro: "Touca/gorro", meia: "Meia", luva: "Luva", sapato: "Sapatinho", babador: "Babador", macacao: "Macacão", vestido: "Vestido" };
+const COMP_KW = { blusa: /blusa|camisa|camiseta|regata/, calca: /calca|mijao|culote|legging/ };
+const ATTRS = {
+  manga: { label: "Manga", opts: { curta: "Manga curta", longa: "Manga longa", regata: "Regata" },
+    kw: { curta: /manga curta|\bm\/?c\b|curtinha/, longa: /manga longa|manga comprida|\bm\/?l\b/, regata: /regata|sem manga/ } },
+  corte: { label: "Corte", opts: { completo: "Completo", cima: "Parte de cima" },
+    kw: { completo: /completo|com perna|com pernas|inteiro|com pe\b/, cima: /parte de cima|so a parte de cima|superior/ } },
+  pe: { label: "Pé", opts: { com: "Com pé", sem: "Sem pé" },
+    kw: { com: /com pe\b|com pezinho|com pes\b/, sem: /sem pe\b|sem pezinho|sem pes\b/ } },
+  abertura: { label: "Abertura", opts: { ziper: "Zíper", botao: "Botão de pressão", cabeca: "Pela cabeça", transpassado: "Transpassado" },
+    kw: { ziper: /ziper|\bzip\b/, botao: /botao|botoes|pressao/, cabeca: /pela cabeca|gola americana/, transpassado: /transpassad|kimono|envelope/ } },
+  modelo_calca: { label: "Modelo", opts: { mijao: "Mijão", culote: "Culote", legging: "Legging", jogger: "Moletom/jogger", comum: "Calça comum" },
+    kw: { mijao: /mijao/, culote: /culote/, legging: /legging/, jogger: /moletom|jogger/ } },
+  modelo_casaco: { label: "Modelo", opts: { moletom: "Moletom/blusão", cardiga: "Cardigã", jaqueta: "Jaqueta", colete: "Colete", sueter: "Suéter/tricô" },
+    kw: { moletom: /moletom|bluson|blusao/, cardiga: /cardig/, jaqueta: /jaqueta|corta.?vento/, colete: /colete/, sueter: /sueter|trico|\bla\b/ } },
+  modelo_gorro: { label: "Modelo", opts: { touca: "Touca de malha", gorro: "Gorro tricô/lã", chapeu: "Chapéu/boné", faixa: "Faixa/tiara" },
+    kw: { touca: /touca/, gorro: /gorro|trico|\bla\b/, chapeu: /chapeu|\bbone\b/, faixa: /faixa|tiara|\blaco\b/ } },
+  modelo_sapato: { label: "Modelo", opts: { tenis: "Tênis", trico: "Sapatinho tricô", pantufa: "Pantufa", botinha: "Botinha", sandalia: "Sandália" },
+    kw: { tenis: /tenis/, trico: /trico|\bla\b|croche/, pantufa: /pantufa/, botinha: /botinha|\bbota\b/, sandalia: /sandalia|papete/ } },
+  modelo_manta: { label: "Modelo", opts: { manta: "Manta", cueiro: "Cueiro", cobertor: "Cobertor/edredom", swaddle: "Swaddle/saco de dormir" },
+    kw: { manta: /manta/, cueiro: /cueiro/, cobertor: /cobertor|edredom/, swaddle: /swaddle|saco de dormir/ } },
+  modelo_toalha: { label: "Modelo", opts: { capuz: "Com capuz", fralda: "Toalha-fralda", comum: "Comum", rosto: "De rosto/mão" },
+    kw: { capuz: /capuz/, fralda: /fralda/, rosto: /rosto|\bmao\b|maozinha/ } },
+  modelo_fralda: { label: "Modelo", opts: { descartavel: "Descartável", pano: "De pano", ecologica: "Ecológica" },
+    kw: { descartavel: /descart|pampers|huggies|pacote/, pano: /\bpano\b|tecido/, ecologica: /ecolog|reutiliz/ } },
+  clima: { label: "Clima", opts: { leve: "Leve (calor)", quente: "Quente (frio)", meia: "Meia-estação" },
+    kw: { quente: /plush|soft|moletom|fleece|\bla\b|trico|forrad|quentinh|inverno|termic/, leve: /regata|manga curta|\bleve\b|verao|fresquinh|linho/, meia: /meia.?estacao/ } },
+  componentes: { label: "Composição do conjunto", multi: true, opts: COMP_LABEL }
+};
+const TYPE_ATTRS = {
+  body: ["manga", "corte", "abertura", "clima"], macacao: ["manga", "pe", "abertura", "clima"], conjunto: ["componentes", "manga", "clima"],
+  blusa: ["manga", "clima"], vestido: ["manga", "clima"], casaco: ["modelo_casaco", "abertura"], calca: ["modelo_calca", "pe", "clima"],
+  short: ["clima"], gorro: ["modelo_gorro"], sapato: ["modelo_sapato"], manta: ["modelo_manta"], toalha: ["modelo_toalha"],
+  fralda: ["modelo_fralda"], meia: ["clima"]
+};
+const attrsFor = t => TYPE_ATTRS[t] || [];
+function detectAttrs(desc, type){
+  const n = norm(desc), out = {};
+  for (const key of attrsFor(type)) {
+    const a = ATTRS[key];
+    if (a.multi) {
+      const comps = [];
+      for (const ck of Object.keys(COMP_LABEL)) if ((COMP_KW[ck] || typeByKey(ck).kw).test(n)) comps.push(ck);
+      if (comps.length) out[key] = comps;
+      continue;
+    }
+    for (const ok of Object.keys(a.kw || {})) if (a.kw[ok].test(n)) { out[key] = ok; break; }
+  }
+  return out;
+}
+const attrLabel = (key, val) => (ATTRS[key] && ATTRS[key].opts[val]) || val;
+function attrSummary(p){
+  const out = [], at = p.attrs || {};
+  for (const key of attrsFor(p.type)) {
+    const v = at[key];
+    if (!v) continue;
+    out.push(Array.isArray(v) ? v.map(c => COMP_LABEL[c] || c).join(" + ") : attrLabel(key, v));
+  }
+  return out;
+}
+function renderAttrs(container, type, attrs, onChange){
+  if (!container) return;
+  const keys = attrsFor(type);
+  if (!keys.length) { container.innerHTML = ""; return; }
+  container.innerHTML = keys.map(key => {
+    const a = ATTRS[key], cur = attrs[key];
+    return '<div class="field"><label>' + esc(a.label) + '</label><div class="attrchips" data-key="' + key + '">' +
+      Object.keys(a.opts).map(ok => {
+        const on = a.multi ? (Array.isArray(cur) && cur.includes(ok)) : cur === ok;
+        return '<button type="button" class="achipbtn' + (on ? " on" : "") + '" data-v="' + ok + '">' + esc(a.opts[ok]) + "</button>";
+      }).join("") + "</div></div>";
+  }).join("");
+  container.querySelectorAll(".attrchips").forEach(row => {
+    const key = row.dataset.key, a = ATTRS[key];
+    row.querySelectorAll(".achipbtn").forEach(b => b.onclick = () => {
+      const v = b.dataset.v;
+      if (a.multi) {
+        const arr = Array.isArray(attrs[key]) ? attrs[key].slice() : [];
+        const i = arr.indexOf(v);
+        if (i >= 0) arr.splice(i, 1); else arr.push(v);
+        if (arr.length) attrs[key] = arr; else delete attrs[key];
+      } else if (attrs[key] === v) delete attrs[key];
+      else attrs[key] = v;
+      onChange(key);
+      renderAttrs(container, type, attrs, onChange);
+    });
+  });
+}
 
 /* ================= parsing ================= */
 function detectType(text){
@@ -772,7 +883,7 @@ let S = null;
 const DEFAULT_CATS = ["Roupas RN", "Roupas P", "Roupas M", "Higiene e banho", "Quarto", "Passeio", "Alimentação"];
 function freshState(){
   return {
-    v: 3, settings: { babyName: "João Pedro" },
+    v: 4, settings: { babyName: "João Pedro" },
     categories: DEFAULT_CATS.map(n => ({ id: uid(), name: n })),
     items: [], pieces: [], looks: []
   };
@@ -793,6 +904,13 @@ function migrate(s){
     s.v = 3;
     s.settings = s.settings || {};
     if (!s.settings.babyName) s.settings.babyName = "João Pedro";
+  }
+  if (s.v < 4) {
+    s.v = 4;
+    (s.pieces || []).forEach(p => {
+      if (!p.attrs) p.attrs = detectAttrs(p.desc || p.name || "", p.type);
+      if (p.note === undefined) p.note = "";
+    });
   }
   return s;
 }
@@ -941,6 +1059,12 @@ async function viewInicio(){
     '<div class="st"><b>' + Math.max(0, total - got) + "</b>a comprar</div>" +
     '<div class="st"><b>' + S.looks.length + "</b>looks</div></div></div></div>";
   h += '<div class="searchjump" data-act="gosearch">' + icon("search") + "Buscar no armário — nome, tipo, tamanho, cor…</div>";
+  if (S.pieces.length) {
+    const inv = inventory();
+    const top = TYPES.filter(t => inv[t.key]).map(t => ({ t, n: inv[t.key].direct + inv[t.key].fromSets })).sort((a, b) => b.n - a.n).slice(0, 5);
+    h += '<div class="invcard" data-act="goinv"><div class="t">Inventário</div><div class="l">' +
+      top.map(x => esc(x.t.label) + " <b>" + x.n + "</b>").join(" · ") + (TYPES.filter(t => inv[t.key]).length > 5 ? " · …" : "") + "</div></div>";
+  }
   for (const ins of insights())
     h += '<div class="insight' + (ins.act ? " action" : "") + '"' + (ins.act ? ' data-act="' + ins.act + '"' : "") + '><span class="em">' + ins.em + "</span><span>" + esc(ins.txt) + "</span></div>";
   const cur = sizeForNow();
@@ -997,9 +1121,10 @@ function viewLista(){
 }
 
 /* ================= view: armário (busca facetada) ================= */
-const arm = { q: "", type: new Set(), size: new Set(), color: new Set() };
+const arm = { q: "", type: new Set(), size: new Set(), color: new Set(), attrs: {}, mode: "fotos" };
+const invOpen = new Set();
 function pieceHay(p){
-  return norm([p.name, p.desc, typeByKey(p.type).label, groupOfType(p.type).label, p.size, (p.colors || []).join(" "), (p.tags || []).join(" ")].join(" "));
+  return norm([p.name, p.desc, p.note, typeByKey(p.type).label, groupOfType(p.type).label, p.size, (p.colors || []).join(" "), (p.tags || []).join(" "), attrSummary(p).join(" ")].join(" "));
 }
 function pieceMatches(p, skip){
   if (arm.q) {
@@ -1009,7 +1134,96 @@ function pieceMatches(p, skip){
   if (skip !== "type" && arm.type.size && !arm.type.has(p.type)) return false;
   if (skip !== "size" && arm.size.size && ![...arm.size].some(s => norm(p.size) === norm(s))) return false;
   if (skip !== "color" && arm.color.size && !(p.colors || []).some(c => arm.color.has(c))) return false;
+  for (const key of Object.keys(arm.attrs)) {
+    const set = arm.attrs[key];
+    if (!set || !set.size || skip === "attr:" + key) continue;
+    const v = (p.attrs || {})[key];
+    if (Array.isArray(v)) { if (![...set].every(x => v.includes(x))) return false; }
+    else if (set.has("_")) { if (v) return false; }
+    else if (!set.has(v)) return false;
+  }
   return true;
+}
+function setArmFilter(o){
+  arm.q = ""; arm.type = new Set(o.type ? [o.type] : []); arm.size = new Set(o.size ? [o.size] : []); arm.color = new Set(); arm.attrs = o.attrs || {}; arm.mode = "fotos";
+}
+/* ---- inventário ---- */
+function inventory(){
+  const inv = {};
+  const get = t => inv[t] || (inv[t] = { direct: 0, fromSets: 0, attrs: {}, combos: {} });
+  for (const p of S.pieces) {
+    const e = get(p.type), at = p.attrs || {};
+    e.direct++;
+    for (const key of attrsFor(p.type)) {
+      if (key === "componentes") continue;
+      const v = at[key] || "_";
+      e.attrs[key] = e.attrs[key] || {};
+      e.attrs[key][v] = (e.attrs[key][v] || 0) + 1;
+    }
+    if (p.type === "conjunto") {
+      const comps = (at.componentes || []).slice().sort();
+      const ck = comps.length ? comps.map(c => COMP_LABEL[c] || c).join(" + ") : "Composição não informada";
+      e.combos[ck] = e.combos[ck] || { n: 0, comps };
+      e.combos[ck].n++;
+      for (const c of comps) get(c).fromSets++;
+    }
+  }
+  return inv;
+}
+function inventoryText(){
+  const inv = inventory();
+  const lines = [appTitle() + " — inventário (" + S.pieces.length + " peças)"];
+  for (const g of GROUPS) {
+    const types = TYPES.filter(t => t.g === g.key && inv[t.key] && inv[t.key].direct + inv[t.key].fromSets > 0);
+    if (!types.length) continue;
+    lines.push("", g.label.toUpperCase());
+    for (const t of types) {
+      const e = inv[t.key];
+      lines.push(t.label + " (" + (e.direct + e.fromSets) + ")" + (e.fromSets ? " — " + e.fromSets + " em conjuntos" : ""));
+      if (t.key === "conjunto") for (const ck of Object.keys(e.combos)) lines.push("   • " + ck + " (" + e.combos[ck].n + ")");
+      for (const key of Object.keys(e.attrs)) for (const v of Object.keys(e.attrs[key])) if (v !== "_") lines.push("   • " + attrLabel(key, v) + " (" + e.attrs[key][v] + ")");
+    }
+  }
+  return lines.join("\n");
+}
+function inventoryHTML(){
+  if (!S.pieces.length) return '<div class="empty"><div class="big">📋</div>Nada no inventário ainda.<br>As contagens aparecem conforme as peças forem guardadas.</div>';
+  const inv = inventory();
+  let h = '<div class="invtop"><span>' + S.pieces.length + " peças no armário</span>" +
+    '<button class="iconbtn" id="inv-share">Copiar lista</button></div>';
+  for (const g of GROUPS) {
+    const types = TYPES.filter(t => t.g === g.key && inv[t.key] && inv[t.key].direct + inv[t.key].fromSets > 0);
+    if (!types.length) continue;
+    const gTotal = types.reduce((a, t) => a + inv[t.key].direct, 0);
+    h += '<section class="shelf"><div class="shelf-head">' + icon(g.ic) + "<h2>" + esc(g.label) + '</h2><span class="count">' + gTotal + "</span></div>";
+    for (const t of types) {
+      const e = inv[t.key], total = e.direct + e.fromSets, open = invOpen.has(t.key);
+      h += '<div class="invrow"><div class="invmain" data-inv="' + t.key + '"><span class="chev">' + (open ? "▾" : "▸") + '</span><span class="invname">' + esc(t.label) + '</span><span class="invcount">' + total + "</span></div>";
+      if (e.fromSets) h += '<div class="invsub">' + e.direct + (e.direct === 1 ? " avulso" : " avulsos") + " · " + e.fromSets + " em conjuntos</div>";
+      if (open) {
+        h += '<div class="invdetail">';
+        if (t.key === "conjunto") {
+          h += '<div class="invattr">Composição</div>';
+          for (const ck of Object.keys(e.combos).sort((a, b) => e.combos[b].n - e.combos[a].n))
+            h += '<button class="invsubrow" data-combo="' + esc(e.combos[ck].comps.join(",")) + '">' + esc(ck) + "<span>" + e.combos[ck].n + "</span></button>";
+        }
+        for (const key of Object.keys(e.attrs)) {
+          const vals = e.attrs[key], known = Object.keys(vals).filter(v => v !== "_");
+          if (!known.length) continue;
+          h += '<div class="invattr">' + esc(ATTRS[key].label) + "</div>";
+          for (const v of known.sort((a, b) => vals[b] - vals[a]))
+            h += '<button class="invsubrow" data-type="' + t.key + '" data-key="' + key + '" data-v="' + esc(v) + '">' + esc(attrLabel(key, v)) + "<span>" + vals[v] + "</span></button>";
+          if (vals._) h += '<button class="invsubrow muted" data-type="' + t.key + '" data-key="' + key + '" data-v="_">Não informado<span>' + vals._ + "</span></button>";
+        }
+        if (e.fromSets) h += '<button class="invsubrow" data-insets="' + t.key + '">Dentro de conjuntos<span>' + e.fromSets + "</span></button>";
+        h += '<button class="invsubrow" data-type="' + t.key + '" data-all="1">Ver todas as peças<span>' + e.direct + "</span></button>";
+        h += "</div>";
+      }
+      h += "</div>";
+    }
+    h += "</section>";
+  }
+  return h;
 }
 function facetCounts(field, getVals){
   const counts = new Map();
@@ -1020,15 +1234,43 @@ function facetCounts(field, getVals){
   return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 function viewArmarioShell(){
-  return '<div class="searchbar' + (arm.q ? " has" : "") + '">' + icon("search") +
+  const tog = '<div class="toggler"><button data-mode="fotos" class="' + (arm.mode === "fotos" ? "on" : "") + '">Peças</button>' +
+    '<button data-mode="inventario" class="' + (arm.mode === "inventario" ? "on" : "") + '">Inventário</button></div>';
+  if (arm.mode === "inventario") return tog + '<div id="armres"></div>';
+  return tog + '<div class="searchbar' + (arm.q ? " has" : "") + '">' + icon("search") +
     '<input type="search" id="armq" placeholder="Buscar: body, azul, RN, toalha…" value="' + esc(arm.q) + '" autocomplete="off">' +
     '<button class="clr" id="armclr" aria-label="Limpar busca">✕</button></div>' +
     '<div class="facets" id="facets"></div><div id="armres"></div>';
 }
+function bindInventory(res){
+  res.querySelectorAll(".invmain[data-inv]").forEach(el => el.onclick = () => {
+    const k = el.dataset.inv;
+    if (invOpen.has(k)) invOpen.delete(k); else invOpen.add(k);
+    refreshArmario();
+  });
+  res.querySelectorAll(".invsubrow").forEach(el => el.onclick = () => {
+    const d = el.dataset;
+    if (d.combo !== undefined) setArmFilter({ type: "conjunto", attrs: { componentes: new Set(d.combo ? d.combo.split(",") : []) } });
+    else if (d.insets) setArmFilter({ type: "conjunto", attrs: { componentes: new Set([d.insets]) } });
+    else if (d.all) setArmFilter({ type: d.type });
+    else setArmFilter({ type: d.type, attrs: { [d.key]: new Set([d.v]) } });
+    render();
+  });
+  const sh = res.querySelector("#inv-share");
+  if (sh) sh.onclick = async () => {
+    const txt = inventoryText();
+    if (navigator.share) { try { await navigator.share({ text: txt, title: "Inventário — " + appTitle() }); return; } catch (e) { if (e && e.name === "AbortError") return; } }
+    try { await navigator.clipboard.writeText(txt); toast("Lista copiada ✓"); } catch (e) { toast("Não consegui copiar"); }
+  };
+}
 async function refreshArmario(){
-  const fx = $("#facets"), res = $("#armres");
-  if (!fx || !res) return;
-  const hasFilter = arm.q || arm.type.size || arm.size.size || arm.color.size;
+  const res = $("#armres");
+  if (!res) return;
+  if (arm.mode === "inventario") { res.innerHTML = inventoryHTML(); bindInventory(res); return; }
+  const fx = $("#facets");
+  if (!fx) return;
+  const hasAttrs = Object.keys(arm.attrs).some(k => arm.attrs[k] && arm.attrs[k].size);
+  const hasFilter = arm.q || arm.type.size || arm.size.size || arm.color.size || hasAttrs;
   /* facetas */
   let fh = "";
   const tf = facetCounts("type", p => [p.type]);
@@ -1052,11 +1294,32 @@ async function refreshArmario(){
       fh += '<button class="fchip' + (arm.color.has(k) ? " on" : "") + '" data-facet="color" data-v="' + k + '"><span class="cdot" style="background:' + (COLOR_HEX[k] || "#999") + '"></span>' + esc(cap(k)) + ' <span class="n">' + n + "</span></button>";
     fh += "</div>";
   }
+  /* facetas de subclassificação: só quando um único tipo está em jogo */
+  const typesInPlay = new Set(S.pieces.filter(p => pieceMatches(p, "type")).map(p => p.type));
+  const soloType = arm.type.size === 1 ? [...arm.type][0] : (typesInPlay.size === 1 ? [...typesInPlay][0] : null);
+  if (soloType) {
+    for (const key of attrsFor(soloType)) {
+      const af = facetCounts("attr:" + key, p => { const v = (p.attrs || {})[key]; return Array.isArray(v) ? v : (v ? [v] : []); });
+      const sel = arm.attrs[key] || new Set();
+      if (af.length < 1 && !sel.size) continue;
+      fh += '<div class="facetrow"><span class="flbl" style="width:auto;margin-right:2px">' + esc(ATTRS[key].label.split(" ")[0]) + "</span>";
+      for (const [k, n] of af.slice(0, 10))
+        fh += '<button class="fchip' + (sel.has(k) ? " on" : "") + '" data-facet="attr" data-key="' + key + '" data-v="' + esc(k) + '">' + esc(attrLabel(key, k)) + ' <span class="n">' + n + "</span></button>";
+      fh += "</div>";
+    }
+  }
   fx.innerHTML = fh;
   fx.querySelectorAll(".fchip").forEach(ch => ch.onclick = () => {
-    const set = arm[ch.dataset.facet];
     const v = ch.dataset.v;
-    if (set.has(v)) set.delete(v); else set.add(v);
+    if (ch.dataset.facet === "attr") {
+      const key = ch.dataset.key;
+      arm.attrs[key] = arm.attrs[key] || new Set();
+      if (arm.attrs[key].has(v)) arm.attrs[key].delete(v); else arm.attrs[key].add(v);
+    } else {
+      const set = arm[ch.dataset.facet];
+      if (set.has(v)) set.delete(v); else set.add(v);
+      if (ch.dataset.facet === "type") arm.attrs = {};
+    }
     refreshArmario();
   });
   /* resultados */
@@ -1087,10 +1350,12 @@ async function refreshArmario(){
 async function pieceCardHTML(p){
   const u = await photoURL(p.photoId);
   const dots = (p.colors || []).slice(0, 3).map(c => '<span class="cdot" style="background:' + (COLOR_HEX[c] || "#999") + '"></span>').join("");
+  const sub = attrSummary(p).slice(0, 2).join(" · ");
   return '<div class="piece" data-act="piece" data-id="' + p.id + '">' +
     '<div class="ph">' + (u ? '<img src="' + u + '" alt="">' : icon(groupOfType(p.type).ic)) +
     (p.size ? '<span class="szb">' + esc(p.size) + "</span>" : "") + "</div>" +
-    '<div class="pinfo"><div class="pname">' + esc(p.name) + '</div><div class="dots">' + dots + "</div></div></div>";
+    '<div class="pinfo"><div class="pname">' + esc(p.name) + '</div><div class="dots">' + dots + "</div>" +
+    (sub ? '<div class="pmeta">' + esc(sub) + "</div>" : "") + "</div></div>";
 }
 
 /* ================= view: looks ================= */
@@ -1153,12 +1418,14 @@ function bindView(){
       else if (a === "newlook") modalNewLook();
       else if (a === "look") modalLook(id);
       else if (a === "togglepend") { onlyPending = el.dataset.v === "1"; render(); }
-      else if (a === "gosearch" || a === "goarmario") gotoTab("armario");
-      else if (a === "gosize") { arm.q = ""; arm.type.clear(); arm.color.clear(); arm.size = new Set([el.dataset.size]); gotoTab("armario"); }
+      else if (a === "gosearch" || a === "goarmario") { arm.mode = "fotos"; gotoTab("armario"); }
+      else if (a === "goinv") { arm.mode = "inventario"; gotoTab("armario"); }
+      else if (a === "gosize") { setArmFilter({ size: el.dataset.size }); gotoTab("armario"); }
       else if (a === "golista") gotoTab("lista");
       else if (a === "settings") modalSettings();
     });
   });
+  $("#view").querySelectorAll(".toggler [data-mode]").forEach(b => b.onclick = () => { arm.mode = b.dataset.mode; render(); });
   const q = $("#armq");
   if (q) {
     q.oninput = () => {
@@ -1236,7 +1503,8 @@ async function quickAddStep(entry, idx, total, lockItem, onDone){
   const t0 = detectType(entry.desc);
   entry.type = entry.type || (t0 ? t0.key : "");
   entry.colors = entry.colors || [];
-  const touched = { type: false, size: false };
+  entry.attrs = entry.attrs || detectAttrs(entry.desc, entry.type);
+  const touched = { type: false, size: false, attrs: {} };
   if (entry.blob && !entry.colors.length) extractColors(entry.blob).then(cs => {
     entry.photoColors = cs;
     if (!entry.colorsTouched) {
@@ -1264,19 +1532,32 @@ async function quickAddStep(entry, idx, total, lockItem, onDone){
     '<div class="field"><label>Tamanho</label><select id="qa-size">' +
     '<option value="">—</option>' + sizeOpts.filter(Boolean).map(s => '<option value="' + esc(s) + '"' + (s === entry.size ? " selected" : "") + ">" + esc(s) + "</option>").join("") +
     "</select></div></div>" +
+    '<div id="qa-attrs"></div>' +
     '<div class="field"><label>Cores</label><div class="colorpick" id="qa-colors"></div></div>' +
+    '<div class="field"><label>Observação (marca, presente de quem…)</label><input type="text" id="qa-note" value="' + esc(entry.note || "") + '" placeholder="Ex.: presente da vovó Ana"></div>' +
     '<div class="field"><label>Vincular à lista de compras</label><select id="qa-link"' + (lockItem ? " disabled" : "") + ">" + linkOptions(entry, lockItem) + "</select></div>" +
     '<div class="btnrow"><button class="btn ghost" id="qa-cancel">' + (total > 1 ? "Pular esta" : "Cancelar") + "</button>" +
     '<button class="btn primary" id="qa-save">Guardar no armário</button></div>'
   );
   const descIn = m.querySelector("#qa-desc"), typeSel = m.querySelector("#qa-type"), sizeSel = m.querySelector("#qa-size"), linkSel = m.querySelector("#qa-link");
+  const attrBox = m.querySelector("#qa-attrs");
+  const onAttrTouched = key => { touched.attrs[key] = true; paintChips(); };
   function paintChips(){
     const chips = [];
     const t = typeSel.value ? typeByKey(typeSel.value) : null;
     if (t) chips.push("👕 " + t.label + " · " + groupByKey(t.g).label);
+    for (const s of attrSummary({ type: typeSel.value, attrs: entry.attrs })) chips.push("• " + s);
     if (sizeSel.value) chips.push("📏 " + sizeSel.value);
     for (const tag of detectTags(descIn.value)) chips.push("🏷 " + tag);
     m.querySelector("#qa-chips").innerHTML = chips.map(c => '<span class="achip">' + esc(c) + "</span>").join("");
+  }
+  function redetectAttrs(){
+    const det = detectAttrs(entry.desc, entry.type);
+    for (const key of attrsFor(entry.type)) {
+      if (touched.attrs[key]) continue;
+      if (det[key]) entry.attrs[key] = det[key]; else delete entry.attrs[key];
+    }
+    renderAttrs(attrBox, entry.type, entry.attrs, onAttrTouched);
   }
   function reparse(){
     entry.desc = descIn.value;
@@ -1285,6 +1566,7 @@ async function quickAddStep(entry, idx, total, lockItem, onDone){
       typeSel.value = t ? t.key : "";
       entry.type = typeSel.value;
     }
+    redetectAttrs();
     if (!touched.size) {
       const sz = detectSize(entry.desc);
       if (sz) {
@@ -1301,9 +1583,10 @@ async function quickAddStep(entry, idx, total, lockItem, onDone){
     paintChips();
   }
   descIn.oninput = () => { clearTimeout(descIn._t); descIn._t = setTimeout(reparse, 220); };
-  typeSel.onchange = () => { touched.type = true; entry.type = typeSel.value; paintChips(); };
+  typeSel.onchange = () => { touched.type = true; entry.type = typeSel.value; touched.attrs = {}; redetectAttrs(); paintChips(); };
   sizeSel.onchange = () => { touched.size = true; entry.size = sizeSel.value; paintChips(); };
   paintColors(m, entry);
+  renderAttrs(attrBox, entry.type, entry.attrs, onAttrTouched);
   paintChips();
   /* foto */
   const drop = m.querySelector("#qa-drop"), file = m.querySelector("#qa-file");
@@ -1379,9 +1662,12 @@ async function quickAddStep(entry, idx, total, lockItem, onDone){
     const linked = itemId ? S.items.find(i => i.id === itemId) : null;
     let photoId = null;
     if (entry.blob) { photoId = uid(); await photoPut(photoId, entry.blob); }
+    const attrs = {};
+    for (const key of attrsFor(type)) if (entry.attrs && entry.attrs[key]) attrs[key] = entry.attrs[key];
     S.pieces.push({
       id: uid(), itemId, name: cleanName(descIn.value, t), desc: descIn.value.trim(),
-      type, size: sizeSel.value.trim(), colors: entry.colors || [], tags: detectTags(descIn.value),
+      type, size: sizeSel.value.trim(), colors: entry.colors || [], tags: detectTags(descIn.value), attrs,
+      note: m.querySelector("#qa-note").value.trim(),
       catId: linked ? linked.catId : null, photoId, date: new Date().toISOString().slice(0, 10)
     });
     await persist();
@@ -1410,7 +1696,7 @@ async function modalPiece(id){
   if (!p) return;
   const u = await photoURL(p.photoId);
   const usedIn = S.looks.filter(l => l.pieces.some(lp => lp.pieceId === p.id));
-  const entry = { colors: (p.colors || []).slice(), colorsTouched: false };
+  const entry = { colors: (p.colors || []).slice(), colorsTouched: false, attrs: JSON.parse(JSON.stringify(p.attrs || {})) };
   const linked = p.itemId ? S.items.find(i => i.id === p.itemId) : null;
   const sizeOpts = [...new Set([p.size, ...SIZES_STD])].filter(Boolean);
   const m = openModal(
@@ -1422,7 +1708,9 @@ async function modalPiece(id){
     TYPES.map(t => '<option value="' + t.key + '"' + (t.key === p.type ? " selected" : "") + ">" + esc(t.label) + "</option>").join("") + "</select></div>" +
     '<div class="field"><label>Tamanho</label><select id="pd-size"><option value="">—</option>' +
     sizeOpts.map(s => '<option value="' + esc(s) + '"' + (s === p.size ? " selected" : "") + ">" + esc(s) + "</option>").join("") + "</select></div></div>" +
+    '<div id="pd-attrs"></div>' +
     '<div class="field"><label>Cores</label><div class="colorpick" id="pd-colors"></div></div>' +
+    '<div class="field"><label>Observação (marca, presente de quem…)</label><input type="text" id="pd-note" value="' + esc(p.note || "") + '"></div>' +
     '<div class="note" style="margin:0 0 4px">' +
     esc([linked ? "Vinculada a: " + linked.name : "", p.date ? "guardada em " + p.date.split("-").reverse().join("/") : ""].filter(Boolean).join(" · ")) +
     (usedIn.length ? "<br>Nos looks: " + usedIn.map(l => esc(l.name)).join(", ") : "") + "</div>" +
@@ -1433,6 +1721,13 @@ async function modalPiece(id){
     '<button class="btn primary" id="pd-save">Salvar</button></div>'
   );
   paintColors(m, entry);
+  const pdType = m.querySelector("#pd-type"), pdAttrs = m.querySelector("#pd-attrs");
+  renderAttrs(pdAttrs, pdType.value, entry.attrs, () => {});
+  pdType.onchange = () => {
+    const det = detectAttrs(m.querySelector("#pd-desc").value, pdType.value);
+    for (const key of attrsFor(pdType.value)) if (!entry.attrs[key] && det[key]) entry.attrs[key] = det[key];
+    renderAttrs(pdAttrs, pdType.value, entry.attrs, () => {});
+  };
   let newBlob = null;
   const enhBtn = m.querySelector("#pd-enh");
   if (enhBtn) enhBtn.onclick = async () => {
@@ -1486,6 +1781,9 @@ async function modalPiece(id){
     p.size = m.querySelector("#pd-size").value;
     p.colors = entry.colors;
     p.tags = detectTags(p.desc);
+    p.note = m.querySelector("#pd-note").value.trim();
+    p.attrs = {};
+    for (const key of attrsFor(p.type)) if (entry.attrs[key]) p.attrs[key] = entry.attrs[key];
     p.name = cleanName(p.desc, typeByKey(p.type));
     await persist(); closeModal(); render(); toast("Peça atualizada");
   };
