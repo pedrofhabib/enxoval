@@ -18,11 +18,11 @@ CATS = [
 ]
 CAT_ALIASES = {
     "roupas_rn": r"roupas?.*\brn\b",
-    "roupas_p": r"roupas?.*\bp\b|0-3",
-    "roupas_m": r"roupas?.*\bm\b(?!eses|\w)|3-6",
-    "roupas_g": r"roupas?.*\bg\b(?!g)|6-9",
-    "roupas_gg": r"roupas?.*\bgg\b|9-12",
-    "roupas_geral": r"roupas?.*geral|uso geral",
+    "roupas_p": r"roupas?.*(\bp\b|0-3)",
+    "roupas_m": r"roupas?.*(\bm\b(?!eses|\w)|3-6)",
+    "roupas_g": r"roupas?.*(\bg\b(?!g)|6-9)",
+    "roupas_gg": r"roupas?.*(\bgg\b|9-12)",
+    "roupas_geral": r"roupas?.*(geral|uso geral)",
     "quarto": r"quarto",
     "banho": r"higiene|banho",
     "eletronicos": r"eletr",
