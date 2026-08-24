@@ -1031,7 +1031,7 @@ async function render(){
   else if (TAB === "armario") { v.innerHTML = viewArmarioShell(); await refreshArmario(); }
   else v.innerHTML = await viewLooks();
   bindView();
-  if (pendingScroll) { const id = pendingScroll; pendingScroll = null; requestAnimationFrame(() => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }); }
+  if (pendingScroll) { const id = pendingScroll; pendingScroll = null; setTimeout(() => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 30); }
 }
 let pendingScroll = null;
 
