@@ -132,6 +132,9 @@ nav.tabs button.on{color:var(--accent-ink);font-weight:600}
 .dashrow .bar{margin-top:7px}
 .dashrow .chev{flex:none;color:var(--muted);font-size:1.2rem;line-height:1}
 
+@keyframes flashcat{0%{background:var(--accent-soft)}100%{background:transparent}}
+.cat.flash .cat-head{border-radius:12px;animation:flashcat 1.1s ease-out}
+
 /* ===== lista ===== */
 .cat{margin-bottom:14px}
 .cat-head{display:flex;align-items:center;gap:10px;padding:4px 2px 8px}
@@ -1031,7 +1034,16 @@ async function render(){
   else if (TAB === "armario") { v.innerHTML = viewArmarioShell(); await refreshArmario(); }
   else v.innerHTML = await viewLooks();
   bindView();
-  if (pendingScroll) { const id = pendingScroll; pendingScroll = null; setTimeout(() => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 30); }
+  if (pendingScroll) {
+    const id = pendingScroll; pendingScroll = null;
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "auto", block: "start" });
+      el.classList.add("flash");
+      setTimeout(() => el.classList.remove("flash"), 1100);
+    }, 30);
+  }
 }
 let pendingScroll = null;
 
