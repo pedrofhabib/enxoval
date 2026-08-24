@@ -29,7 +29,7 @@ CAT_ALIASES = {
     "alimentacao": r"aliment",
     "farmacia": r"farmac",
     "passeio": r"passeio|transporte",
-    "adicionais": r"adicional",
+    "adicionais": r"adicion",
 }
 
 def it(cat, name, qty, size="", note="", source=None):
