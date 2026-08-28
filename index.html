@@ -1184,6 +1184,10 @@ function viewPainel(){
     '<div class="dinfo"><div class="dname">Comprar no Brasil<b>' + brasilN + ' pendentes</b></div>' +
     '<div class="note" style="margin:2px 0 0">Deixar para a viagem</div></div><span class="chev">›</span></button>';
 
+  h += '<button class="dashrow" data-act="relatorio">' + icon("list", "di") +
+    '<div class="dinfo"><div class="dname">Gerar lista completa</div>' +
+    '<div class="note" style="margin:2px 0 0">Relatório para ler, imprimir ou compartilhar</div></div><span class="chev">›</span></button>';
+
   const cats = categoryStats().sort((a, b) => b.remaining - a.remaining || a.pct - b.pct);
   h += '<div class="sechead"><h2>Por categoria</h2></div>';
   for (const c of cats) {
@@ -1543,6 +1547,7 @@ function bindView(){
       else if (a === "gosize") { setArmFilter({ size: el.dataset.size }); gotoTab("armario"); }
       else if (a === "golista") gotoTab("lista");
       else if (a === "gobrasil") { listFilter = "brasil"; gotoTab("lista"); }
+      else if (a === "relatorio") gerarRelatorio();
       else if (a === "painelfilter") { listFilter = el.dataset.v; gotoTab("lista"); }
       else if (a === "painelcat") { listFilter = "tudo"; pendingScroll = "cat-" + id; gotoTab("lista"); }
       else if (a === "settings") modalSettings();
@@ -2307,6 +2312,210 @@ function modalSettings(){
   };
 }
 
+/* ================= relatório do enxoval ================= */
+function reportFileName(){
+  const d = new Date();
+  const stamp = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  return "enxoval-" + norm(S.settings.babyName || "bebe").replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") + "-" + stamp + ".html";
+}
+function buildReportHTML(){
+  const { total, got } = listTotals();
+  const pct = total ? Math.round(100 * got / total) : 0;
+  const b = babyInfo();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+  const title = appTitle();
+  const faltam = Math.max(0, total - got);
+  const sub = b && !b.born
+    ? "Faltam " + b.weeks + (b.weeks === 1 ? " semana" : " semanas") + " para a chegada"
+    : b && b.born
+      ? (b.months < 1 ? "Recém-chegado ao mundo" : Math.floor(b.months) + (Math.floor(b.months) === 1 ? " mês" : " meses") + " de vida")
+      : "";
+
+  const cats = S.categories.concat([{ id: "__none", name: "Sem categoria" }]).map(c => {
+    const items = S.items.filter(i => c.id === "__none" ? !S.categories.some(x => x.id === i.catId) : i.catId === c.id);
+    const ct = items.reduce((a, i) => a + (i.qty || 1), 0);
+    const cg = items.reduce((a, i) => a + Math.min(boughtOf(i), i.qty || 1), 0);
+    return { name: c.name, items, ct, cg, pct: ct ? Math.round(100 * cg / ct) : 0 };
+  }).filter(c => c.items.length);
+
+  function itemRow(it, pending){
+    const bo = boughtOf(it), q = it.qty || 1, falta = Math.max(0, q - bo);
+    let tags = "";
+    if (it.size) tags += '<span class="tag">' + esc(it.size) + "</span>";
+    if (it.source === "brasil") tags += '<span class="tag br">Comprar no Brasil</span>';
+    if (pending && bo > 0) tags += '<span class="tag part">já tem ' + bo + " de " + q + "</span>";
+    const note = it.note ? '<p class="note">' + esc(it.note) + "</p>" : "";
+    const qty = pending
+      ? '<div class="qty"><b>' + falta + "</b><span>" + (falta === 1 ? "falta" : "faltam") + "</span></div>"
+      : '<div class="qty done"><b>' + bo + "</b><span>" + (bo === 1 ? "unidade" : "unidades") + "</span></div>";
+    return '<li class="' + (pending ? "pending" : "done") + '">' +
+      (pending ? '<span class="box"></span>' : '<span class="tick">✓</span>') +
+      '<div class="body"><p class="nm">' + esc(it.name) + "</p>" + (tags ? '<p class="tags">' + tags + "</p>" : "") + note + "</div>" +
+      qty + "</li>";
+  }
+
+  let faltaHTML = "", temHTML = "";
+  for (const c of cats) {
+    const pend = c.items.filter(i => boughtOf(i) < (i.qty || 1));
+    const done = c.items.filter(i => boughtOf(i) >= (i.qty || 1));
+    if (pend.length) {
+      const rest = pend.reduce((a, i) => a + Math.max(0, (i.qty || 1) - boughtOf(i)), 0);
+      faltaHTML += '<section class="cat"><header class="cathead"><h3>' + esc(c.name) + "</h3>" +
+        '<span class="catn">' + rest + (rest === 1 ? " unidade" : " unidades") + "</span></header>" +
+        '<ul class="items">' + pend.map(i => itemRow(i, true)).join("") + "</ul></section>";
+    }
+    if (done.length) {
+      temHTML += '<section class="cat"><header class="cathead"><h3>' + esc(c.name) + "</h3>" +
+        '<span class="catn">' + done.length + (done.length === 1 ? " item" : " itens") + "</span></header>" +
+        '<ul class="items">' + done.map(i => itemRow(i, false)).join("") + "</ul></section>";
+    }
+  }
+
+  const inv = inventory();
+  let invHTML = "";
+  for (const g of GROUPS) {
+    const types = TYPES.filter(t => t.g === g.key && inv[t.key] && inv[t.key].direct + inv[t.key].fromSets > 0);
+    if (!types.length) continue;
+    invHTML += '<section class="cat"><header class="cathead"><h3>' + esc(g.label) + "</h3></header><ul class=\"inv\">";
+    for (const t of types) {
+      const e = inv[t.key], tot = e.direct + e.fromSets;
+      let detail = [];
+      if (e.fromSets) detail.push(e.direct + " avulso" + (e.direct === 1 ? "" : "s") + " · " + e.fromSets + " em conjuntos");
+      if (t.key === "conjunto") for (const ck of Object.keys(e.combos)) detail.push(ck + " (" + e.combos[ck].n + ")");
+      for (const key of Object.keys(e.attrs)) {
+        const vals = e.attrs[key];
+        const parts = Object.keys(vals).filter(v => v !== "_").sort((a, x) => vals[x] - vals[a]).map(v => attrLabel(key, v) + " (" + vals[v] + ")");
+        if (parts.length) detail.push(parts.join(", "));
+      }
+      invHTML += '<li><span class="ivn">' + esc(t.label) + '</span><span class="ivc">' + tot + "</span>" +
+        (detail.length ? '<p class="ivd">' + esc(detail.join(" · ")) + "</p>" : "") + "</li>";
+    }
+    invHTML += "</ul></section>";
+  }
+
+  const brasil = S.items.filter(i => i.source === "brasil" && boughtOf(i) < (i.qty || 1));
+  const brasilHTML = brasil.length
+    ? '<section class="block br-block"><h2>Comprar no Brasil</h2><ul class="items">' +
+      brasil.map(i => itemRow(i, true)).join("") + "</ul></section>"
+    : "";
+
+  const css = "@page{margin:16mm 14mm}" +
+    "*{box-sizing:border-box}" +
+    "html,body{margin:0;padding:0}" +
+    "body{background:#EFECE5;color:#2B3640;font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;print-color-adjust:exact;-webkit-print-color-adjust:exact}" +
+    ".page{max-width:820px;margin:0 auto;background:#fff;padding:44px 46px 56px;box-shadow:0 2px 20px rgba(43,54,64,.12)}" +
+    ".serif{font-family:Georgia,'Iowan Old Style','Palatino Linotype',Palatino,serif}" +
+    ".eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8792A0;font-weight:600}" +
+    "h1{font-family:Georgia,'Iowan Old Style','Palatino Linotype',Palatino,serif;font-size:36px;line-height:1.15;margin:6px 0 4px;font-weight:400;letter-spacing:-.01em}" +
+    ".sub{color:#6B7680;font-size:14px;margin:0 0 26px}" +
+    ".bigbar{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}" +
+    ".bigpct{font-family:Georgia,serif;font-size:44px;line-height:1;color:#46789E}" +
+    ".bigtxt{font-size:13px;color:#6B7680}" +
+    ".track{height:10px;background:#E7E3DA;border-radius:99px;overflow:hidden;margin-bottom:26px}" +
+    ".track i{display:block;height:100%;background:#46789E;border-radius:99px}" +
+    ".tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:34px}" +
+    ".tile{border:1px solid #E4E0D7;border-radius:12px;padding:12px 10px;text-align:center}" +
+    ".tile b{display:block;font-family:Georgia,serif;font-size:24px;line-height:1.1}" +
+    ".tile span{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#8792A0;margin-top:4px}" +
+    ".tile.f b{color:#A85C48}.tile.d b{color:#5E8A70}" +
+    ".block{margin-bottom:34px}" +
+    "h2{font-family:Georgia,serif;font-size:22px;font-weight:400;margin:0 0 4px;padding-bottom:8px;border-bottom:2px solid #2B3640;break-after:avoid}" +
+    ".blurb{font-size:13px;color:#6B7680;margin:8px 0 18px}" +
+    ".cat{margin-bottom:20px;break-inside:avoid}" +
+    ".cathead{display:flex;align-items:baseline;gap:10px;border-bottom:1px solid #E4E0D7;padding-bottom:5px;margin-bottom:8px}" +
+    ".cathead h3{font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:0;flex:1;font-weight:700}" +
+    ".catn{font-size:11px;color:#8792A0}" +
+    "ul.items{list-style:none;margin:0;padding:0}" +
+    "ul.items li{display:flex;align-items:flex-start;gap:11px;padding:7px 0;border-bottom:1px solid #F1EEE8;break-inside:avoid}" +
+    "ul.items li:last-child{border-bottom:0}" +
+    ".box{flex:none;width:14px;height:14px;border:1.5px solid #A9B2BC;border-radius:3px;margin-top:2px}" +
+    ".tick{flex:none;width:14px;margin-top:1px;color:#5E8A70;font-size:13px;text-align:center}" +
+    ".body{flex:1;min-width:0}" +
+    ".nm{margin:0;font-size:14px;font-weight:600}" +
+    "li.done .nm{font-weight:500;color:#5A6470}" +
+    ".tags{margin:3px 0 0;display:flex;flex-wrap:wrap;gap:5px}" +
+    ".tag{font-size:10px;background:#F0EDE6;color:#6B7680;border-radius:99px;padding:2px 8px;letter-spacing:.02em}" +
+    ".tag.br{background:#E4EEF5;color:#35608A}" +
+    ".tag.part{background:#FBF0DC;color:#8A6636}" +
+    ".note{margin:3px 0 0;font-size:11.5px;color:#8792A0;line-height:1.4}" +
+    ".qty{flex:none;text-align:right;min-width:56px}" +
+    ".qty b{display:block;font-family:Georgia,serif;font-size:19px;line-height:1;color:#A85C48}" +
+    ".qty span{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:#8792A0}" +
+    ".qty.done b{color:#5E8A70}" +
+    "ul.inv{list-style:none;margin:0;padding:0}" +
+    "ul.inv li{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid #F1EEE8;break-inside:avoid}" +
+    "ul.inv li:last-child{border-bottom:0}" +
+    ".ivn{flex:1;font-size:14px;font-weight:600}" +
+    ".ivc{font-family:Georgia,serif;font-size:17px;color:#46789E}" +
+    ".ivd{flex-basis:100%;margin:2px 0 0;font-size:11.5px;color:#8792A0}" +
+    ".br-block h2{border-bottom-color:#46789E}" +
+    "footer{margin-top:40px;padding-top:14px;border-top:1px solid #E4E0D7;font-size:11px;color:#A0A9B4;display:flex;justify-content:space-between;gap:12px}" +
+    "#print{position:fixed;right:20px;bottom:20px;background:#46789E;color:#fff;border:0;border-radius:99px;padding:13px 22px;font:600 14px/1 inherit;box-shadow:0 4px 16px rgba(43,54,64,.28);cursor:pointer}" +
+    "@media print{body{background:#fff}.page{box-shadow:none;max-width:none;padding:0}#print{display:none}}" +
+    "@media(max-width:640px){.page{padding:24px 18px 40px}h1{font-size:27px}.tiles{grid-template-columns:repeat(2,1fr)}}";
+
+  const esc2 = s => esc(s);
+  return "<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\">" +
+    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+    "<title>" + esc2(title) + " — lista completa</title><style>" + css + "</style></head><body>" +
+    '<button id="print" onclick="window.print()">Imprimir ou salvar PDF</button>' +
+    '<div class="page">' +
+    '<div class="eyebrow">Lista do enxoval</div>' +
+    "<h1>" + esc2(title) + "</h1>" +
+    '<p class="sub">Atualizada em ' + esc2(dateStr) + (sub ? " · " + esc2(sub) : "") + "</p>" +
+    '<div class="bigbar"><span class="bigpct">' + pct + '%</span><span class="bigtxt">do enxoval comprado<br>' + got + " de " + total + " unidades</span></div>" +
+    '<div class="track"><i style="width:' + pct + '%"></i></div>' +
+    '<div class="tiles">' +
+    '<div class="tile"><b>' + S.items.length + "</b><span>Itens na lista</span></div>" +
+    '<div class="tile d"><b>' + got + "</b><span>Já comprados</span></div>" +
+    '<div class="tile f"><b>' + faltam + "</b><span>Faltam comprar</span></div>" +
+    '<div class="tile"><b>' + S.pieces.length + "</b><span>Peças no armário</span></div></div>" +
+    (faltaHTML ? '<section class="block"><h2>Falta comprar</h2><p class="blurb">Marque conforme for comprando. O número à direita é quanto ainda falta de cada item.</p>' + faltaHTML + "</section>" : "") +
+    brasilHTML +
+    (temHTML ? '<section class="block"><h2>Já temos</h2><p class="blurb">Itens da lista com a quantidade completa.</p>' + temHTML + "</section>" : "") +
+    (invHTML ? '<section class="block"><h2>No armário, por tipo</h2><p class="blurb">Tudo que já está guardado, contado por tipo de peça. Conjuntos também somam nas peças que os compõem.</p>' + invHTML + "</section>" : "") +
+    "<footer><span>" + esc2(title) + "</span><span>Gerado em " + esc2(dateStr) + "</span></footer>" +
+    "</div></body></html>";
+}
+async function gerarRelatorio(){
+  if (!S.items.length && !S.pieces.length) { toast("Adicione itens à lista primeiro"); return; }
+  const html = buildReportHTML();
+  const fname = reportFileName();
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const file = new File([blob], fname, { type: "text/html" });
+  const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  const m = openModal(
+    "<h3>Lista do enxoval</h3>" +
+    '<div class="note" style="margin:0 0 14px">Relatório completo: progresso geral, o que falta comprar (com quadradinhos para marcar), o que já está completo e o inventário por tipo de peça.</div>' +
+    '<div class="btnrow"><button class="btn primary" id="r-open">Abrir para ler ou imprimir</button></div>' +
+    '<div class="btnrow">' + (canShare ? '<button class="btn ghost" id="r-share">Compartilhar</button>' : "") +
+    '<button class="btn ghost" id="r-save">Baixar arquivo</button></div>' +
+    '<div class="btnrow"><button class="btn ghost" id="r-close">Fechar</button></div>' +
+    '<div class="note">Para virar PDF: abra o relatório e use o botão “Imprimir ou salvar PDF”.</div>'
+  );
+  m.querySelector("#r-open").onclick = () => {
+    const w = window.open(url, "_blank");
+    if (!w) toast("O navegador bloqueou a nova aba — use “Baixar arquivo”");
+    else closeModal();
+  };
+  m.querySelector("#r-save").onclick = () => {
+    const a = document.createElement("a");
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast("Relatório baixado ✓");
+  };
+  const sh = m.querySelector("#r-share");
+  if (sh) sh.onclick = async () => {
+    try { await navigator.share({ files: [file], title: appTitle() }); closeModal(); }
+    catch (e) { if (!e || e.name !== "AbortError") toast("Não consegui compartilhar — tente baixar"); }
+  };
+  m.querySelector("#r-close").onclick = () => { URL.revokeObjectURL(url); closeModal(); };
+}
+
+/* ================= backup ================= */
+
 /* ================= backup ================= */
 async function exportBackup(){
   toast("Preparando backup…");
@@ -2389,6 +2598,7 @@ $("#menubtn").onclick = e => {
   const canUndoSeed = identifySeedItems().length > 0 || identifySeedPieces().length > 0;
   d.innerHTML =
     '<button data-m="settings">⚙️ Configurações do bebê</button>' +
+    '<button data-m="relatorio">📄 Gerar lista completa</button>' +
     '<button data-m="dicas">💡 Dicas de compra</button>' +
     '<button data-m="importseed">📋 Carregar planilha do enxoval</button>' +
     (canUndoSeed ? '<button data-m="undoseed">↩️ Desfazer importação da planilha</button>' : "") +
@@ -2399,6 +2609,7 @@ $("#menubtn").onclick = e => {
   d.querySelectorAll("button").forEach(b => b.onclick = () => {
     d.remove();
     if (b.dataset.m === "settings") modalSettings();
+    else if (b.dataset.m === "relatorio") gerarRelatorio();
     else if (b.dataset.m === "dicas") modalDicas();
     else if (b.dataset.m === "importseed") modalImportSeed();
     else if (b.dataset.m === "undoseed") modalUndoSeed();
