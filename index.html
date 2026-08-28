@@ -2453,7 +2453,7 @@ function buildReportHTML(){
     "footer{margin-top:40px;padding-top:14px;border-top:1px solid #E4E0D7;font-size:11px;color:#A0A9B4;display:flex;justify-content:space-between;gap:12px}" +
     "#print{position:fixed;right:20px;bottom:20px;background:#46789E;color:#fff;border:0;border-radius:99px;padding:13px 22px;font:600 14px/1 inherit;box-shadow:0 4px 16px rgba(43,54,64,.28);cursor:pointer}" +
     "@media print{body{background:#fff}.page{box-shadow:none;max-width:none;padding:0}#print{display:none}}" +
-    "@media(max-width:640px){.page{padding:24px 18px 40px}h1{font-size:27px}.tiles{grid-template-columns:repeat(2,1fr)}}";
+    "@media(max-width:640px){.page{padding:24px 18px 96px}h1{font-size:27px}.tiles{grid-template-columns:repeat(2,1fr)}#print{right:14px;bottom:14px;padding:12px 18px}}";
 
   const esc2 = s => esc(s);
   return "<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\">" +
