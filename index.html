@@ -2068,15 +2068,32 @@ function importSeed(part){
     S.pieces.push(piece);
     addedPieces++;
   });
+  const mergedItems = part === "roupas" ? mergeLegacyItems() : 0;
   persist();
-  return { addedItems, updatedItems, addedPieces, linked };
+  return { addedItems, updatedItems, addedPieces, linked, mergedItems };
 }
 /* Itens que existiram em versões anteriores da planilha e depois mudaram de
-   categoria — precisam continuar sendo reconhecidos pelo "desfazer". */
+   categoria. Continuam reconhecidos pelo "desfazer" e, na importação, são
+   fundidos no item novo (as peças vinculadas vão junto) para não duplicar. */
 const LEGACY_SEED_ITEMS = [
-  { cat: "quarto", name: "Enxoval de berco" },
-  { cat: "quarto", name: "Saco de dormir" }
+  { cat: "quarto", name: "Enxoval de berco", to: { cat: "roupas_rn", name: "Enxoval de berco" } },
+  { cat: "quarto", name: "Saco de dormir", to: { cat: "roupas_rn", name: "Saco de dormir" } }
 ];
+function mergeLegacyItems(){
+  let merged = 0;
+  for (const lg of LEGACY_SEED_ITEMS) {
+    if (!lg.to) continue;
+    const oldCat = seedCatId(lg.cat, false), newCat = seedCatId(lg.to.cat, false);
+    if (!oldCat || !newCat || oldCat === newCat) continue;
+    const oldIt = S.items.find(x => x.catId === oldCat && norm(x.name) === norm(lg.name));
+    const newIt = S.items.find(x => x.catId === newCat && norm(x.name) === norm(lg.to.name));
+    if (!oldIt || !newIt || oldIt.id === newIt.id) continue;
+    S.pieces.forEach(p => { if (p.itemId === oldIt.id) { p.itemId = newIt.id; p.catId = newIt.catId; } });
+    S.items = S.items.filter(x => x.id !== oldIt.id);
+    merged++;
+  }
+  return merged;
+}
 function identifySeedItems(){
   const seen = new Set(), out = [];
   const add = it => { if (it && !seen.has(it.id)) { seen.add(it.id); out.push(it); } };
@@ -2150,14 +2167,15 @@ function modalImportSeed(){
   m.querySelector("#f-cancel").onclick = closeModal;
   m.querySelector("#f-go").onclick = () => {
     if (!sel.roupas && !sel.geral) { toast("Escolha ao menos uma parte"); return; }
-    let add = 0, upd = 0, pc = 0;
+    let add = 0, upd = 0, pc = 0, mg = 0;
     for (const p of ["roupas", "geral"]) {
       if (!sel[p]) continue;
       const r = importSeed(p);
-      add += r.addedItems; upd += r.updatedItems; pc += r.addedPieces;
+      add += r.addedItems; upd += r.updatedItems; pc += r.addedPieces; mg += r.mergedItems || 0;
     }
     closeModal(); render();
-    const partes = [add ? add + " itens novos" : "", upd ? upd + " atualizados" : "", pc ? pc + " peças" : ""].filter(Boolean);
+    const partes = [add ? add + " itens novos" : "", upd ? upd + " atualizados" : "",
+      pc ? pc + " peças" : "", mg ? mg + " duplicados fundidos" : ""].filter(Boolean);
     toast(partes.length ? partes.join(" · ") : "Nada a mudar — já estava tudo em dia");
   };
 }
