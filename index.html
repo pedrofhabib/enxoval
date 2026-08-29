@@ -363,6 +363,7 @@ nav.tabs button.on{color:var(--accent-ink);font-weight:600}
 
 <script>
 "use strict";
+const APP_BUILD = "2026-08-29c";
 /* ================= IndexedDB ================= */
 const DBN = "armario-bebe-db";
 let _db = null;
@@ -1103,6 +1104,7 @@ async function viewInicio(){
     '<div class="statrow"><div class="st"><b>' + S.pieces.length + "</b>peças</div>" +
     '<div class="st"><b>' + Math.max(0, total - got) + "</b>a comprar</div>" +
     '<div class="st"><b>' + S.looks.length + "</b>looks</div></div></div></div>";
+  h += seedBannerHTML();
   h += '<div class="searchjump" data-act="gosearch">' + icon("search") + "Buscar no armário — nome, tipo, tamanho, cor…</div>";
   if (S.pieces.length) {
     const inv = inventory();
@@ -1203,8 +1205,8 @@ function viewLista(){
   let h = '<div class="listactions">' +
     '<button class="iconbtn" data-act="additem">+ Adicionar item</button>' +
     '<button class="iconbtn" data-act="import">Importar lista</button>' +
-    (S.items.length < 5 ? '<button class="iconbtn" data-act="importseed">📋 Carregar planilha do enxoval</button>' : "") +
-    "</div>";
+    '<button class="iconbtn" data-act="importseed">📋 Carregar planilha do enxoval</button>' +
+    "</div>" + seedBannerHTML();
   if (S.items.length) {
     const naoIniN = S.items.filter(i => boughtOf(i) === 0).length;
     const parcN = S.items.filter(i => { const bo = boughtOf(i), q = i.qty || 1; return bo > 0 && bo < q; }).length;
@@ -2148,6 +2150,33 @@ function modalUndoSeed(){
     toast(items.length + " itens e " + pieces.length + " peças removidos");
   };
 }
+/* Simulação: quanto a planilha mudaria na lista atual, sem alterar nada. */
+function seedPreview(part){
+  const seed = SEED_PARTS[part];
+  let toAdd = 0, toUpdate = 0;
+  for (const si of seed.items) {
+    const catId = seedCatId(si.cat, false);
+    const ex = catId ? S.items.find(x => x.catId === catId && norm(x.name) === norm(si.name)) : null;
+    if (!ex) { toAdd++; continue; }
+    if (ex.qty !== si.qty || (ex.size || "") !== (si.size || "") ||
+        (ex.note || "") !== (si.note || "") || (ex.source || null) !== (si.source || null)) toUpdate++;
+  }
+  const havePieces = new Set(S.pieces.filter(p => p.seedPart === part && p.seedIdx !== undefined).map(p => p.seedIdx));
+  const toAddPieces = seed.pieces.filter((_, i) => !havePieces.has(i)).length;
+  return { toAdd, toUpdate, toAddPieces, total: toAdd + toUpdate + toAddPieces };
+}
+function seedBannerHTML(){
+  if (!S.items.length) return "";
+  const p = seedPreview("roupas");
+  if (!p.total) return "";
+  const bits = [];
+  if (p.toAdd) bits.push(p.toAdd + (p.toAdd === 1 ? " item novo" : " itens novos"));
+  if (p.toUpdate) bits.push(p.toUpdate + (p.toUpdate === 1 ? " a corrigir" : " a corrigir"));
+  if (p.toAddPieces) bits.push(p.toAddPieces + (p.toAddPieces === 1 ? " peça" : " peças") + " de “já tenho”");
+  return '<div class="insight action" data-act="importseed" style="background:var(--accent-soft)">' +
+    '<span class="em">📋</span><span><b>Planilha de roupas atualizada</b><br>' + esc(bits.join(" · ")) +
+    ". Toque para aplicar.</span></div>";
+}
 function modalImportSeed(){
   const un = p => SEED_PARTS[p].items.reduce((a, i) => a + i.qty, 0);
   const sel = { roupas: true, geral: true };
@@ -2363,6 +2392,8 @@ function modalSettings(){
     '<div class="field"><label>Nome do bebê (opcional)</label><input type="text" id="s-name" value="' + esc(st.babyName || "") + '" placeholder="Ex.: Miguel"></div>' +
     '<div class="field"><label>Data prevista do nascimento</label><input type="date" id="s-due" value="' + esc(st.dueDate || "") + '"></div>' +
     '<div class="note">Com a data, o Início mostra a contagem regressiva, o tamanho que serve em cada fase e alertas inteligentes de compra.</div>' +
+    '<div class="note" style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px">Versão do app: <b>' + APP_BUILD +
+    "</b> · planilha de roupas: " + SEED_PARTS.roupas.items.length + " itens</div>" +
     '<div class="btnrow"><button class="btn ghost" id="s-cancel">Cancelar</button><button class="btn primary" id="s-save">Salvar</button></div>'
   );
   m.querySelector("#s-cancel").onclick = closeModal;
