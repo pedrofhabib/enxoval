@@ -107,12 +107,63 @@ OBSOLETE = [
     {"cat": "roupas_gg", "name": "Roupa de sair"},
 ]
 
-# ---------------- geral (inalterado) ----------------
+# ---------------- acentuacao (o app casa por texto sem acento, entao
+# renomear nao duplica nada; melhora so a exibicao) ----------------
+WORDS = [
+    ("Calca", "Calça"), ("calca", "calça"), ("Macacao", "Macacão"), ("macacao", "macacão"),
+    ("berco", "berço"), ("Saida", "Saída"), ("saida", "saída"), ("Sapatinho", "Sapatinho"),
+    ("Fraldao", "Fraldão"), ("descartaveis", "descartáveis"), ("Termometro", "Termômetro"),
+    ("termometro", "termômetro"), ("amamentacao", "amamentação"), ("Sutia", "Sutiã"),
+    ("Baba eletronica", "Babá eletrônica"), ("Ruido", "Ruído"), ("Maquina", "Máquina"),
+    ("esterilizar", "esterilizar"), ("transicao", "transição"), ("refeicao", "refeição"),
+    ("termica", "térmica"), ("termico", "térmico"), ("alimentacao", "alimentação"),
+    ("alcool", "álcool"), ("bebe", "bebê"), ("Oleo", "Óleo"), ("Lenco", "Lenço"),
+    ("umedecido de agua", "umedecido de água"), ("lencois", "lençóis"),
+    ("Atencao", "Atenção"), ("supervisao", "supervisão"), ("vigilancia", "vigilância"),
+    ("Recomendacao", "Recomendação"), ("Tecidos", "Tecidos"), ("Opcional", "Opcional"),
+    ("organizacao", "organização"), ("maternidade", "maternidade"), ("nao", "não"),
+    ("e usado", "é usado"), ("arranhoes", "arranhões"), ("rostinho", "rostinho"),
+    ("elastico", "elástico"), ("Ja completo", "Já completo"), ("pecas", "peças"),
+    ("Referencia", "Referência"), ("Farmacia", "Farmácia"), ("uteis", "úteis"),
+    ("eletronicos", "eletrônicos"), ("opcao", "opção"), ("preco", "preço"),
+    ("importantissimo", "importantíssimo"), ("Algodao", "Algodão"), ("mes", "mês"),
+    ("meses", "meses"), ("Estacoes", "Estações"), ("Comprada", "Comprada"),
+]
+import re as _re
+def fix(s):
+    if not s:
+        return s
+    for a, b in WORDS:
+        s = _re.sub(r"\b" + _re.escape(a) + r"\b", b, s)
+    return s
+
+def fix_items(items):
+    for i in items:
+        i["name"] = fix(i["name"])
+        i["note"] = fix(i.get("note") or "")
+    return items
+def fix_pieces(pieces):
+    for p in pieces:
+        p["desc"] = fix(p["desc"])
+        p["note"] = fix(p.get("note") or "")
+        if p.get("link"):
+            p["link"][1] = fix(p["link"][1])
+    return pieces
+
+# ---------------- geral ----------------
 prev = json.load(open("seeds.json", encoding="utf-8"))
+geral = prev["geral"]
+fix_items(geral["items"]); fix_pieces(geral["pieces"])
+fix_items(ROUPAS_ITEMS); fix_pieces(ROUPAS_PIECES)
+for r in RENAME:
+    r["from"] = fix(r["from"]); r["to"] = fix(r["to"])
+for o in OBSOLETE:
+    o["name"] = fix(o["name"])
+
 out = {
     "cats": prev["cats"],
     "roupas": {"items": ROUPAS_ITEMS, "pieces": ROUPAS_PIECES, "rename": RENAME, "obsolete": OBSOLETE},
-    "geral": prev["geral"],
+    "geral": geral,
     "tips": prev["tips"],
 }
 json.dump(out, open("seeds.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
