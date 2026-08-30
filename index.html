@@ -363,7 +363,7 @@ nav.tabs button.on{color:var(--accent-ink);font-weight:600}
 
 <script>
 "use strict";
-const APP_BUILD = "2026-08-30d";
+const APP_BUILD = "2026-08-30e";
 /* ================= IndexedDB ================= */
 const DBN = "armario-bebe-db";
 let _db = null;
@@ -995,7 +995,9 @@ const appTitle = () => (S && S.settings && S.settings.babyName) ? "Enxoval do " 
 async function loadState(){
   const s = await kvGet("app");
   S = s ? migrate(s) : freshState();
-  if (!s) await kvSet("app", S);
+  const n = s ? autoLinkPieces() : 0;
+  if (!s || n) await kvSet("app", S);
+  if (n) setTimeout(() => toast(n + (n === 1 ? " peça do armário entrou" : " peças do armário entraram") + " na contagem da lista"), 600);
 }
 let persistTimer = null;
 function persist(){
@@ -1065,6 +1067,68 @@ function componentCredits(){
   return map;
 }
 const boughtOf = item => directBoughtOf(item) + (componentCredits()[item.id] || 0);
+/* ---- vínculo automático de peças com a lista ----
+   Peça guardada sem vínculo passa a contar sozinha no item compatível:
+   mesmo tipo, tamanho compatível e afinidade de atributos; tipos genéricos
+   (higiene, quarto, passeio…) exigem semelhança real de nome — na dúvida,
+   a peça fica sem vínculo em vez de contar no item errado. Vínculo escolhido
+   ou removido à mão (linkTouched) nunca é alterado pelo automático. */
+const GENERIC_TYPES = new Set(["higiene", "saude", "quarto", "passeio", "brinquedo", "mamadeira", "chupeta"]);
+const STOP_TOKENS = new Set(["de", "da", "do", "das", "dos", "com", "para", "por", "sem", "em", "um", "uma"]);
+const nameTokens = s => norm(s).split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !STOP_TOKENS.has(w));
+function bestItemForPiece(p){
+  if (!p.type || p.type === "outro" || p.type === "conjunto") return null;
+  const pTok = new Set(nameTokens((p.name || "") + " " + (p.desc || "")));
+  /* cobertura: só as palavras do nome, sem cores — mede se o item descreve a peça */
+  const pNameTok = nameTokens(p.name || p.desc || "").filter(w => !COLOR_HEX[w]);
+  const pStd = stdSize(p.size), pAttrs = p.attrs || {};
+  let best = null, bestScore = 0;
+  for (const it of S.items) {
+    const t = detectType(it.name);
+    if (!t || t.key !== p.type) continue;
+    let sc = 3;
+    if (p.size && it.size) { if (stdSize(it.size) !== pStd) continue; sc += 2; }
+    else if (!p.size && !it.size) sc += 1;
+    else if (p.size && !it.size) sc += 0.5;
+    else continue; /* peça sem tamanho não adivinha item com tamanho */
+    const itTok = nameTokens(it.name);
+    const shared = itTok.filter(w => pTok.has(w));
+    if (GENERIC_TYPES.has(p.type)) {
+      const sharedName = pNameTok.filter(w => itTok.includes(w));
+      const cov = pNameTok.length ? sharedName.length / pNameTok.length : 0;
+      if (!sharedName.length || (cov < 0.5 && sharedName.length < 2)) continue;
+    }
+    sc += Math.min(2, shared.length * 0.5);
+    const itAttrs = detectAttrs(it.name, p.type);
+    for (const key of Object.keys(itAttrs)) {
+      const pv = pAttrs[key];
+      if (!pv || Array.isArray(pv)) continue;
+      sc += pv === itAttrs[key] ? 2 : -3;
+    }
+    if (sc < 3.5) continue;
+    if (directBoughtOf(it) < (it.qty || 1)) sc += 0.25;
+    if (sc > bestScore) { best = it; bestScore = sc; }
+  }
+  return best;
+}
+function autoLinkPieces(){
+  /* vincula peças soltas e revalida vínculos automáticos antigos;
+     vínculo manual (linkTouched) ou herdado da planilha nunca muda */
+  let n = 0;
+  for (const p of S.pieces) {
+    if (p.linkTouched) continue;
+    if (p.itemId && !p.autoLinked) continue;
+    const it = bestItemForPiece(p);
+    const newId = it ? it.id : null;
+    if ((p.itemId || null) === newId) continue;
+    p.itemId = newId;
+    if (it) p.catId = it.catId;
+    p.autoLinked = !!newId;
+    n++;
+  }
+  if (n) _credits = null;
+  return n;
+}
 const listTotals = () => {
   const total = S.items.reduce((a, i) => a + (i.qty || 1), 0);
   const got = S.items.reduce((a, i) => a + Math.min(boughtOf(i), i.qty || 1), 0);
@@ -1212,7 +1276,6 @@ async function viewInicio(){
     '<div class="statrow"><div class="st"><b>' + S.pieces.length + "</b>peças</div>" +
     '<div class="st"><b>' + Math.max(0, total - got) + "</b>a comprar</div>" +
     '<div class="st"><b>' + S.looks.length + "</b>looks</div></div></div></div>";
-  h += seedBannerHTML();
   if (S.items.length) {
     const naoIni = S.items.filter(i => boughtOf(i) === 0).length;
     const parc = S.items.filter(i => { const bo = boughtOf(i), q = i.qty || 1; return bo > 0 && bo < q; }).length;
@@ -1301,8 +1364,7 @@ function viewLista(){
   let h = '<div class="listactions">' +
     '<button class="iconbtn" data-act="additem">+ Adicionar item</button>' +
     '<button class="iconbtn" data-act="import">Importar lista</button>' +
-    '<button class="iconbtn" data-act="importseed">📋 Carregar planilha do enxoval</button>' +
-    "</div>" + seedBannerHTML();
+    "</div>";
   if (S.items.length) {
     const naoIniN = S.items.filter(i => boughtOf(i) === 0).length;
     const parcN = S.items.filter(i => { const bo = boughtOf(i), q = i.qty || 1; return bo > 0 && bo < q; }).length;
@@ -1763,7 +1825,7 @@ async function quickAddStep(entry, idx, total, lockItem, onDone){
     '<div id="qa-attrs"></div>' +
     '<div class="field"><label>Cores</label><div class="colorpick" id="qa-colors"></div></div>' +
     '<div class="field"><label>Observação (marca, presente de quem…)</label><input type="text" id="qa-note" value="' + esc(entry.note || "") + '" placeholder="Ex.: presente da vovó Ana"></div>' +
-    '<div class="field"><label>Vincular à lista de compras</label><select id="qa-link"' + (lockItem ? " disabled" : "") + ">" + linkOptions(entry, lockItem) + "</select></div>" +
+    '<div class="field"><label>Conta na lista de compras como (automático)</label><select id="qa-link"' + (lockItem ? " disabled" : "") + ">" + linkOptions(entry, lockItem) + "</select></div>" +
     '<div class="btnrow"><button class="btn ghost" id="qa-cancel">' + (total > 1 ? "Pular esta" : "Cancelar") + "</button>" +
     '<button class="btn primary" id="qa-save">Guardar no armário</button></div>'
   );
@@ -1807,12 +1869,13 @@ async function quickAddStep(entry, idx, total, lockItem, onDone){
       entry.colors = [...new Set((entry.photoColors || []).concat(detectTextColors(entry.desc)))].slice(0, 3);
       paintColors(m, entry);
     }
-    if (!lockItem) linkSel.innerHTML = linkOptions(entry, null);
+    if (!lockItem && !entry.linkTouched) linkSel.innerHTML = linkOptions(entry, null);
     paintChips();
   }
   descIn.oninput = () => { clearTimeout(descIn._t); descIn._t = setTimeout(reparse, 220); };
   typeSel.onchange = () => { touched.type = true; entry.type = typeSel.value; touched.attrs = {}; redetectAttrs(); paintChips(); };
   sizeSel.onchange = () => { touched.size = true; entry.size = sizeSel.value; paintChips(); };
+  linkSel.onchange = () => { entry.linkTouched = true; };
   paintColors(m, entry);
   renderAttrs(attrBox, entry.type, entry.attrs, onAttrTouched);
   paintChips();
@@ -1895,9 +1958,10 @@ async function quickAddStep(entry, idx, total, lockItem, onDone){
     S.pieces.push({
       id: uid(), itemId, name: cleanName(descIn.value, t), desc: descIn.value.trim(),
       type, size: sizeSel.value.trim(), colors: entry.colors || [], tags: detectTags(descIn.value), attrs,
-      note: m.querySelector("#qa-note").value.trim(),
+      note: m.querySelector("#qa-note").value.trim(), linkTouched: !!entry.linkTouched,
       catId: linked ? linked.catId : null, photoId, date: new Date().toISOString().slice(0, 10)
     });
+    autoLinkPieces();
     await persist();
     onDone();
   };
@@ -1938,7 +2002,7 @@ async function modalPiece(id){
     '<div id="pd-attrs"></div>' +
     '<div class="field"><label>Cores</label><div class="colorpick" id="pd-colors"></div></div>' +
     '<div class="field"><label>Observação (marca, presente de quem…)</label><input type="text" id="pd-note" value="' + esc(p.note || "") + '"></div>' +
-    '<div class="field"><label>Vincular à lista de compras</label><select id="pd-link">' + linkOptions({ type: p.type, desc: p.desc, size: p.size }, null, p.itemId || "") + "</select></div>" +
+    '<div class="field"><label>Conta na lista de compras como (automático)</label><select id="pd-link">' + linkOptions({ type: p.type, desc: p.desc, size: p.size }, null, p.itemId || "") + "</select></div>" +
     '<div class="note" style="margin:0 0 4px">' +
     esc([p.date ? "guardada em " + p.date.split("-").reverse().join("/") : ""].filter(Boolean).join(" · ")) +
     (usedIn.length ? "<br>Nos looks: " + usedIn.map(l => esc(l.name)).join(", ") : "") + "</div>" +
@@ -1950,6 +2014,7 @@ async function modalPiece(id){
   );
   paintColors(m, entry);
   const pdType = m.querySelector("#pd-type"), pdAttrs = m.querySelector("#pd-attrs");
+  m.querySelector("#pd-link").onchange = () => { entry.linkTouched = true; };
   renderAttrs(pdAttrs, pdType.value, entry.attrs, () => {});
   pdType.onchange = () => {
     const det = detectAttrs(m.querySelector("#pd-desc").value, pdType.value);
@@ -2011,9 +2076,13 @@ async function modalPiece(id){
     p.tags = detectTags(p.desc);
     p.note = m.querySelector("#pd-note").value.trim();
     p.itemId = m.querySelector("#pd-link").value || null;
+    if (entry.linkTouched) { p.linkTouched = true; p.autoLinked = false; }
+    const linked2 = p.itemId ? S.items.find(i => i.id === p.itemId) : null;
+    if (linked2) p.catId = linked2.catId;
     p.attrs = {};
     for (const key of attrsFor(p.type)) if (entry.attrs[key]) p.attrs[key] = entry.attrs[key];
     p.name = cleanName(p.desc, typeByKey(p.type));
+    autoLinkPieces();
     await persist(); closeModal(); render(); toast("Peça atualizada");
   };
 }
@@ -2064,7 +2133,9 @@ function modalItem(id){
     const note = m.querySelector("#f-note").value.trim();
     if (it) Object.assign(it, { name, qty, size, catId, note, source: srcVal });
     else S.items.push({ id: uid(), name, qty, size, catId, note, source: srcVal });
-    persist(); closeModal(); render(); toast(it ? "Item atualizado" : "Item adicionado");
+    const n = autoLinkPieces();
+    persist(); closeModal(); render();
+    toast((it ? "Item atualizado" : "Item adicionado") + (n ? " · " + n + (n === 1 ? " peça do armário vinculada" : " peças do armário vinculadas") : ""));
   };
 }
 function modalImport(){
@@ -2181,6 +2252,9 @@ function importSeed(part){
     S.pieces.push(piece);
     addedPieces++;
   });
+  /* Vincula peças soltas do armário aos itens recém-chegados da planilha,
+     antes de definir as metas — assim elas já entram na conta. */
+  const autoLinked = autoLinkPieces();
   /* Só agora, com as peças de "já tenho" já vinculadas, define a meta de cada
      item: qty = o que já tem + o que a planilha diz que falta comprar. */
   _credits = null;
@@ -2192,7 +2266,7 @@ function importSeed(part){
   const mergedItems = part === "roupas" ? mergeLegacyItems() : 0;
   padronizarCategorias(S);
   persist();
-  return { addedItems, updatedItems, addedPieces, linked, mergedItems };
+  return { addedItems, updatedItems, addedPieces, linked, mergedItems, autoLinked };
 }
 /* Itens da versão anterior da planilha que saíram da atual e não têm
    nenhuma compra registrada — puro resíduo, podem ser removidos. */
@@ -2290,39 +2364,6 @@ function modalUndoSeed(){
     toast(items.length + " itens e " + pieces.length + " peças removidos");
   };
 }
-/* Simulação: quanto a planilha mudaria na lista atual, sem alterar nada. */
-function seedPreview(part){
-  const seed = SEED_PARTS[part];
-  let toAdd = 0, toUpdate = 0;
-  const renamed = {};
-  for (const rn of (seed.rename || [])) renamed[rn.cat + "|" + norm(rn.to)] = norm(rn.from);
-  for (const si of seed.items) {
-    const catId = seedCatId(si.cat, false);
-    const alt = renamed[si.cat + "|" + norm(si.name)];
-    const ex = catId ? S.items.find(x => x.catId === catId &&
-      (norm(x.name) === norm(si.name) || (alt && norm(x.name) === alt))) : null;
-    if (!ex) { toAdd++; continue; }
-    const alvo = si.falta !== undefined ? boughtOf(ex) + si.falta : si.qty;
-    const note = si.note || ex.note || "";
-    if (ex.qty !== alvo || (ex.size || "") !== (si.size || "") ||
-        (ex.note || "") !== note || (ex.source || null) !== (si.source || null)) toUpdate++;
-  }
-  const havePieces = new Set(S.pieces.filter(p => p.seedPart === part && p.seedIdx !== undefined).map(p => p.seedIdx));
-  const toAddPieces = seed.pieces.filter((_, i) => !havePieces.has(i)).length;
-  return { toAdd, toUpdate, toAddPieces, total: toAdd + toUpdate + toAddPieces };
-}
-function seedBannerHTML(){
-  if (!S.items.length) return "";
-  const p = seedPreview("roupas");
-  if (!p.total) return "";
-  const bits = [];
-  if (p.toAdd) bits.push(p.toAdd + (p.toAdd === 1 ? " item novo" : " itens novos"));
-  if (p.toUpdate) bits.push(p.toUpdate + (p.toUpdate === 1 ? " a corrigir" : " a corrigir"));
-  if (p.toAddPieces) bits.push(p.toAddPieces + (p.toAddPieces === 1 ? " peça" : " peças") + " de “já tenho”");
-  return '<div class="insight action" data-act="importseed" style="background:var(--accent-soft)">' +
-    '<span class="em">📋</span><span><b>Planilha de roupas atualizada</b><br>' + esc(bits.join(" · ")) +
-    ". Toque para aplicar.</span></div>";
-}
 function modalImportSeed(){
   const faltaTot = SEED_PARTS.roupas.items.reduce((a, i) => a + (i.falta || 0), 0);
   const geralUn = SEED_PARTS.geral.items.reduce((a, i) => a + (i.qty || 0), 0);
@@ -2350,16 +2391,17 @@ function modalImportSeed(){
   m.querySelector("#f-cancel").onclick = closeModal;
   m.querySelector("#f-go").onclick = () => {
     if (!sel.roupas && !sel.geral) { toast("Escolha ao menos uma parte"); return; }
-    let add = 0, upd = 0, pc = 0, mg = 0, rm = 0;
+    let add = 0, upd = 0, pc = 0, mg = 0, rm = 0, al = 0;
     for (const p of ["roupas", "geral"]) {
       if (!sel[p]) continue;
       const r = importSeed(p);
-      add += r.addedItems; upd += r.updatedItems; pc += r.addedPieces; mg += r.mergedItems || 0;
+      add += r.addedItems; upd += r.updatedItems; pc += r.addedPieces; mg += r.mergedItems || 0; al += r.autoLinked || 0;
     }
     if (sel.limpar && sel.roupas) rm = removeObsoleteSeedItems("roupas");
     closeModal(); render();
     const partes = [add ? add + " itens novos" : "", upd ? upd + " atualizados" : "",
-      pc ? pc + " peças" : "", mg ? mg + " fundidos" : "", rm ? rm + " removidos" : ""].filter(Boolean);
+      pc ? pc + " peças" : "", al ? al + " do armário vinculadas" : "",
+      mg ? mg + " fundidos" : "", rm ? rm + " removidos" : ""].filter(Boolean);
     toast(partes.length ? partes.join(" · ") : "Nada a mudar — já estava tudo em dia");
   };
 }
@@ -3065,6 +3107,7 @@ async function restoreBackup(data){
   urlCache.clear();
   for (const k of Object.keys(data.photos || {})) await photoPut(k, b64ToBlob(data.photos[k]));
   S = migrate(data.state);
+  autoLinkPieces();
   await kvSet("app", S);
   closeModal(); render(); toast("Backup importado ✓");
 }
