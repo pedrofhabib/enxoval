@@ -363,7 +363,7 @@ nav.tabs button.on{color:var(--accent-ink);font-weight:600}
 
 <script>
 "use strict";
-const APP_BUILD = "2026-08-30c";
+const APP_BUILD = "2026-08-30d";
 /* ================= IndexedDB ================= */
 const DBN = "armario-bebe-db";
 let _db = null;
@@ -999,10 +999,72 @@ async function loadState(){
 }
 let persistTimer = null;
 function persist(){
+  _credits = null;
   clearTimeout(persistTimer);
   return new Promise(res => { persistTimer = setTimeout(() => kvSet("app", S).then(res), 60); });
 }
-const boughtOf = item => S.pieces.filter(p => p.itemId === item.id).length;
+const directBoughtOf = item => S.pieces.filter(p => p.itemId === item.id).length;
+/* ---- componentes de conjunto contam individualmente na lista ----
+   Um conjunto "short + blusa" tamanho P credita 1 unidade no item Short P e
+   1 no item Blusa P, casando por tipo e tamanho (e afinidade de atributos,
+   ex.: manga curta vs. longa). Se o conjunto já está vinculado a um item do
+   mesmo tipo de um componente, esse componente é consumido pelo vínculo
+   direto — nunca conta duas vezes no mesmo item. */
+function stdSize(sz){
+  /* remove o sufixo m/mes/meses só depois de dígito — "M" sozinho é o tamanho */
+  const n = norm(sz).trim().replace(/(\d)\s*m(?:es(?:es)?)?$/, "$1");
+  if (/^(rn|0-1)$/.test(n)) return "RN";
+  if (n === "pp") return "PP";
+  if (/^(p|0-3|1-3)$/.test(n)) return "P";
+  if (/^(m|3-6)$/.test(n)) return "M";
+  if (/^(g|6-9)$/.test(n)) return "G";
+  if (/^(gg|9-12)$/.test(n)) return "GG";
+  return n;
+}
+function bestItemForComponent(p, ck){
+  const kw = COMP_KW[ck] || typeByKey(ck).kw;
+  const pStd = stdSize(p.size), pAttrs = p.attrs || {};
+  let best = null, bestScore = -1;
+  for (const it of S.items) {
+    const t = detectType(it.name);
+    if ((!t || t.key !== ck) && !kw.test(norm(it.name))) continue;
+    let sc = 0;
+    const itStd = stdSize(it.size);
+    if (it.size && pStd && itStd === pStd) sc += 4;
+    else if (!it.size) sc += 1;
+    else continue; /* tamanho incompatível */
+    const itAttrs = detectAttrs(it.name, ck);
+    for (const key of Object.keys(itAttrs)) {
+      const pv = pAttrs[key];
+      if (!pv || Array.isArray(pv)) continue;
+      sc += pv === itAttrs[key] ? 2 : -3;
+    }
+    if (directBoughtOf(it) < (it.qty || 1)) sc += 0.5;
+    if (sc > bestScore) { best = it; bestScore = sc; }
+  }
+  return bestScore >= 0 ? best : null;
+}
+let _credits = null;
+function componentCredits(){
+  if (_credits) return _credits;
+  const map = {};
+  for (const p of S.pieces) {
+    if (p.type !== "conjunto") continue;
+    const comps = (p.attrs && p.attrs.componentes) || [];
+    if (!comps.length) continue;
+    const direct = p.itemId ? S.items.find(i => i.id === p.itemId) : null;
+    const directType = direct ? (detectType(direct.name) || {}).key : null;
+    let directConsumed = false;
+    for (const ck of comps) {
+      if (!directConsumed && direct && directType === ck) { directConsumed = true; continue; }
+      const it = bestItemForComponent(p, ck);
+      if (it) map[it.id] = (map[it.id] || 0) + 1;
+    }
+  }
+  _credits = map;
+  return map;
+}
+const boughtOf = item => directBoughtOf(item) + (componentCredits()[item.id] || 0);
 const listTotals = () => {
   const total = S.items.reduce((a, i) => a + (i.qty || 1), 0);
   const got = S.items.reduce((a, i) => a + Math.min(boughtOf(i), i.qty || 1), 0);
@@ -1066,6 +1128,7 @@ function gotoTab(t){
 document.querySelectorAll("nav.tabs button[data-tab]").forEach(b => b.onclick = () => gotoTab(b.dataset.tab));
 
 async function render(){
+  _credits = null;
   const st = S.settings || {};
   $("#apptitle").textContent = appTitle();
   const b = babyInfo();
@@ -1264,10 +1327,12 @@ function viewLista(){
       '<span class="count">' + cg + "/" + ct + '</span><div class="bar"><i style="width:' + (ct ? Math.round(100 * cg / ct) : 0) + '%"></i></div></div>';
     for (const it of items) {
       const bo = boughtOf(it), q = it.qty || 1, done = bo >= q;
+      const cc = componentCredits()[it.id] || 0;
       h += '<div class="itemrow' + (done ? " done" : "") + '">' +
         '<div class="info" data-act="edititem" data-id="' + it.id + '">' +
         '<div class="name">' + esc(it.name) + (it.source === "brasil" ? ' <span class="chipp">🇧🇷</span>' : "") + '</div>' +
         '<div class="meta">' + (it.size ? '<span class="chipp">' + esc(sizeLabel(it.size)) + "</span>" : "") +
+        (cc ? '<span class="chipp">+' + cc + (cc === 1 ? " de conjunto" : " de conjuntos") + "</span>" : "") +
         (it.note ? '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(it.note) + "</span>" : "") + "</div></div>" +
         '<span class="qty"><b>' + bo + "</b>/" + q + "</span>" +
         '<button class="buybtn" data-act="buy" data-id="' + it.id + '" aria-label="Registrar compra">' + (done ? "✓" : "+") + "</button></div>";
@@ -2118,6 +2183,7 @@ function importSeed(part){
   });
   /* Só agora, com as peças de "já tenho" já vinculadas, define a meta de cada
      item: qty = o que já tem + o que a planilha diz que falta comprar. */
+  _credits = null;
   for (const f of faltaPass) {
     const alvo = boughtOf(f.item) + f.falta;
     if (f.item.qty !== alvo) updatedItems++;
