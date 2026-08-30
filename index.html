@@ -370,7 +370,7 @@ nav.tabs button.on{color:var(--accent-ink);font-weight:600}
 
 <script>
 "use strict";
-const APP_BUILD = "2026-08-30f";
+const APP_BUILD = "2026-08-30g";
 /* ================= IndexedDB ================= */
 const DBN = "armario-bebe-db";
 let _db = null;
@@ -926,7 +926,7 @@ let S = null;
 const DEFAULT_CATS = ["Roupas RN (0-1 mês)", "Roupas P (0-3 meses)", "Roupas M (3-6 meses)", "Higiene e banho", "Quarto", "Passeio", "Alimentação"];
 function freshState(){
   return {
-    v: 6, settings: { babyName: "João Pedro" },
+    v: 7, settings: { babyName: "João Pedro" },
     categories: DEFAULT_CATS.map(n => ({ id: uid(), name: n })),
     items: [], pieces: [], looks: []
   };
@@ -965,6 +965,32 @@ function migrate(s){
   if (s.v < 6) {
     s.v = 6;
     padronizarCategorias(s);
+  }
+  if (s.v < 7) {
+    s.v = 7;
+    /* Repara metas de relinks feitos pela build 2026-08-30f sem transferência:
+       peça da planilha que foi movida do item A para o item B leva agora
+       1 unidade de meta junto, para o pendente dos dois voltar ao planejado. */
+    const catBy = key => {
+      const sc = SEEDS.cats.find(c => c.key === key);
+      if (!sc) return null;
+      const re = new RegExp(sc.alias, "i");
+      const c = (s.categories || []).find(x => re.test(norm(x.name)));
+      return c ? c.id : null;
+    };
+    for (const part of Object.keys(SEED_PARTS)) {
+      SEED_PARTS[part].pieces.forEach((sp, idx) => {
+        if (!sp.link) return;
+        const p = (s.pieces || []).find(x => x.seedPart === part && x.seedIdx === idx);
+        if (!p || !p.autoLinked || !p.itemId) return;
+        const oldCat = catBy(sp.link[0]);
+        const oldIt = oldCat ? (s.items || []).find(x => x.catId === oldCat && norm(x.name) === norm(sp.link[1])) : null;
+        const newIt = (s.items || []).find(x => x.id === p.itemId);
+        if (!oldIt || !newIt || oldIt.id === newIt.id) return;
+        oldIt.qty = Math.max(1, (oldIt.qty || 1) - 1);
+        newIt.qty = (newIt.qty || 1) + 1;
+      });
+    }
   }
   return s;
 }
@@ -1126,22 +1152,26 @@ function bestItemForPiece(p){
 function autoLinkPieces(){
   /* vincula peças soltas, revalida vínculos automáticos e corrige vínculo
      herdado que aponta para item de OUTRO tipo (ex.: macacão contado como
-     body, herança da planilha) quando existe item do tipo certo no tamanho
-     certo; escolha manual (linkTouched) nunca muda */
+     body, herança da planilha) ou de outro TAMANHO, quando existe item do
+     tipo e tamanho certos; escolha manual (linkTouched) nunca muda */
   let n = 0;
   for (const p of S.pieces) {
     if (p.linkTouched) continue;
-    let eligible = !p.itemId || p.autoLinked;
+    const cur = p.itemId ? S.items.find(i => i.id === p.itemId) : null;
+    let eligible = !cur || p.autoLinked;
     if (!eligible && p.type && p.type !== "outro" && p.type !== "conjunto") {
-      const cur = S.items.find(i => i.id === p.itemId);
-      const curT = cur ? detectType(cur.name) : null;
-      if (cur && curT && curT.key !== p.type) eligible = true;
+      const curT = detectType(cur.name);
+      if (curT && curT.key !== p.type) eligible = true;
+      else if (p.size && cur.size && stdSize(cur.size) !== stdSize(p.size)) eligible = true;
     }
     if (!eligible) continue;
     const it = bestItemForPiece(p);
-    if (!it && p.itemId && !p.autoLinked) continue; /* sem opção melhor: mantém o herdado */
+    if (!it && cur && !p.autoLinked) continue; /* sem opção melhor: mantém o herdado */
     const newId = it ? it.id : null;
     if ((p.itemId || null) === newId) continue;
+    /* mover uma peça de um item para outro não pode mudar o que falta
+       comprar de nenhum dos dois: a meta acompanha a peça */
+    if (cur && it) { cur.qty = Math.max(1, (cur.qty || 1) - 1); it.qty = (it.qty || 1) + 1; }
     p.itemId = newId;
     if (it) p.catId = it.catId;
     p.autoLinked = !!newId;
@@ -2628,6 +2658,41 @@ async function shareLookImage(look){
   m2.querySelector("#li-ok").onclick = closeModal;
 }
 
+/* ================= conferência da contagem ================= */
+async function modalConferir(){
+  const rows = [];
+  for (const p of S.pieces) {
+    if (p.type === "conjunto") continue; /* componentes contam separadamente */
+    if (!p.itemId) { rows.push({ p, why: "Não conta em nenhum item da lista" }); continue; }
+    const it = S.items.find(i => i.id === p.itemId);
+    if (!it) { rows.push({ p, why: "Vínculo quebrado — o item não existe mais" }); continue; }
+    const t = p.type && p.type !== "outro" ? p.type : null;
+    const itT = detectType(it.name);
+    if (t && itT && itT.key !== t)
+      rows.push({ p, why: "Conta em “" + it.name + "”, que parece ser outro tipo de item" });
+    else if (p.size && it.size && stdSize(p.size) !== stdSize(it.size))
+      rows.push({ p, why: "É " + sizeLabel(p.size) + ", mas conta em “" + it.name + "” (" + sizeLabel(it.size) + ")" });
+  }
+  let h = "<h3>Conferir contagem do armário</h3>";
+  if (!rows.length) {
+    h += '<div class="note" style="margin:0 0 12px">Tudo certo: cada peça do armário está contando em um item compatível da lista. Conjuntos contam pelas peças que os compõem.</div>';
+  } else {
+    h += '<div class="note" style="margin:0 0 10px">' + rows.length + (rows.length === 1 ? " peça pede atenção" : " peças pedem atenção") +
+      ". Toque em uma para abrir e ajustar o vínculo em “Conta na lista de compras como”.</div>";
+    for (const r of rows) {
+      const u = await photoURL(r.p.photoId);
+      h += '<div class="idrow" data-cid="' + r.p.id + '">' +
+        (u ? '<img class="thumb" src="' + u + '" alt="">' : '<span class="thumb">' + icon(groupOfType(r.p.type).ic) + "</span>") +
+        '<span class="nm" style="white-space:normal">' + esc(r.p.name) + (r.p.size ? " · " + esc(sizeLabel(r.p.size)) : "") +
+        '<br><span style="color:var(--muted);font-size:.74rem">' + esc(r.why) + "</span></span></div>";
+    }
+  }
+  h += '<div class="btnrow"><button class="btn primary" id="cf-ok">Fechar</button></div>';
+  const m = openModal(h);
+  m.querySelectorAll("[data-cid]").forEach(el => el.onclick = () => modalPiece(el.dataset.cid));
+  m.querySelector("#cf-ok").onclick = closeModal;
+}
+
 /* ================= configurações ================= */
 function modalSettings(){
   const st = S.settings || {};
@@ -3193,6 +3258,7 @@ $("#menubtn").onclick = e => {
   d.innerHTML =
     '<button data-m="settings">⚙️ Configurações do bebê</button>' +
     '<button data-m="relatorio">📄 Lista do enxoval em PDF</button>' +
+    '<button data-m="conferir">🔍 Conferir contagem do armário</button>' +
     '<button data-m="dicas">💡 Dicas de compra</button>' +
     '<button data-m="importseed">📋 Carregar planilha do enxoval</button>' +
     (canUndoSeed ? '<button data-m="undoseed">↩️ Desfazer importação da planilha</button>' : "") +
@@ -3203,6 +3269,7 @@ $("#menubtn").onclick = e => {
   d.querySelectorAll("button").forEach(b => b.onclick = () => {
     d.remove();
     if (b.dataset.m === "settings") modalSettings();
+    else if (b.dataset.m === "conferir") modalConferir();
     else if (b.dataset.m === "relatorio") gerarRelatorio();
     else if (b.dataset.m === "dicas") modalDicas();
     else if (b.dataset.m === "importseed") modalImportSeed();
